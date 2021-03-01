@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/Masterminds/semver"
 )
 
 func mainBranchVersion(r *GitRepo) (string, error) {
@@ -23,6 +24,13 @@ func mainBranchVersion(r *GitRepo) (string, error) {
 		return "", fmt.Errorf("Failed to get commit count since last release: %s", err)
 	}
 
-	return fmt.Sprintf("%s-beta.%d", latestRelease.name, counter), nil
+	base, err := semver.NewVersion(latestRelease.name)
+	if err != nil {
+		return "", fmt.Errorf("Latest release is not semver: %s", err)
+	}
+
+	*base = base.IncMinor()
+
+	return fmt.Sprintf("%s-beta.%d", base.String(), counter), nil
 
 }
