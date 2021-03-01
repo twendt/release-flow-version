@@ -24,8 +24,11 @@ func newBranch(name string, remote string) *branch {
 }
 
 func (b *branch) isReleaseBranch() bool {
+	remoteName := GetConfig().RemoteName
+	name := strings.TrimPrefix(b.name, "refs/heads/")
+	name = strings.TrimPrefix(name, fmt.Sprintf("refs/remotes/%s/", remoteName))
 	releaseRegex := GetConfig().ReleaseRegex
-	return releaseRegex.MatchString(b.name)
+	return releaseRegex.MatchString(name)
 }
 
 func (b *branch) isMainBranch() bool {
@@ -33,6 +36,9 @@ func (b *branch) isMainBranch() bool {
 }
 
 func (b *branch) isFeatureBranch() bool {
+	remoteName := GetConfig().RemoteName
+	name := strings.TrimPrefix(b.name, "refs/heads/")
+	name = strings.TrimPrefix(name, fmt.Sprintf("refs/remotes/%s/", remoteName))
 	featureRegex := GetConfig().FeatureRegex
 	return featureRegex.MatchString(b.name)
 }

@@ -8,6 +8,11 @@ import (
 	"strings"
 )
 
+const (
+	localBranchPrefix  = "refs/heads/"
+	remoteBranchPrefix = "refs/remotes/"
+)
+
 type GitRepo struct {
 	r   *git.Repository
 	cfg *Config
@@ -29,9 +34,6 @@ func (g *GitRepo) CurrentBranch() (*branch, error) {
 func (g *GitRepo) CommitCountSinceRelease(release *release) (int, error) {
 	mainBranchName := fmt.Sprintf("refs/heads/%s", g.cfg.MainBranch)
 	releaseBranchName := release.branch.name
-	if release.branch.Remote != "" {
-		releaseBranchName = fmt.Sprintf("%s/%s", release.branch.Remote, release.branch.Name())
-	}
 	baseCommit, err := g.MergeBase(mainBranchName, releaseBranchName)
 	if err != nil {
 		return 0, fmt.Errorf("Failed to get merge base commit for %s and %s: %s", g.cfg.MainBranch, release.branch.name, err)
@@ -87,44 +89,35 @@ func (g *GitRepo) MergeBase(b1, b2 string) (*object.Commit, error) {
 }
 
 func (g *GitRepo) Branches() ([]*branch, error) {
-	branches, err := g.r.Branches()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to get branches for repo: %s", err)
-	}
-
 	result := []*branch{}
 
-	err = branches.ForEach(func(p *plumbing.Reference) error {
-		name := string(p.Name())
-		b := newBranch(name, "")
+	references, err := g.r.References()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get references: %s", err)
+	}
+	err = references.ForEach(func(reference *plumbing.Reference) error {
+		name := string(reference.Name())
+		if strings.HasPrefix(name, localBranchPrefix) {
+			b := newBranch(name, "")
+			result = append(result, b)
+			return nil
+		}
 
-		result = append(result, b)
+		remoteName := cfg.RemoteName
+		if remoteName == "" {
+			remoteName = "origin"
+		}
+
+		prefix := fmt.Sprintf("%s%s/", remoteBranchPrefix, remoteName)
+		if strings.HasPrefix(name, prefix) {
+			b := newBranch(name, remoteName)
+			result = append(result, b)
+			return nil
+		}
 
 		return nil
 	})
-
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create list of branches: %s", err)
-	}
-
-	remotes, err := g.r.Remotes()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to get remotes: %s", err)
-	}
-
-	for _, r := range remotes {
-		fmt.Println(r.String())
-		refs, err := r.List(&git.ListOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("Failed to list refs for remote %s: %s", r.String(), err)
-		}
-		for _, ref := range refs {
-			if !strings.HasPrefix(string(ref.Name()), "refs/heads/") {
-				continue
-			}
-			result = append(result, newBranch(string(ref.Name()), r.Config().Name))
-		}
-	}
+	references.Close()
 
 	return result, nil
 }
