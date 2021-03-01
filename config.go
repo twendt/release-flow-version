@@ -8,8 +8,8 @@ import (
 var cfg *Config
 
 const (
-	releaseRegexFormat = `refs/heads/%s(\d+\.\d+\.\d+)`
-	featureRegexFormat = `refs/heads/%s(.*)`
+	releaseRegexFormat = `%s(\d+\.\d+\.\d+)`
+	featureRegexFormat = `%s(.*)`
 )
 
 type Config struct {
@@ -33,7 +33,7 @@ func LoadConfig() error {
 func defaultConfig() *Config {
 	return &Config{
 		DefaultVersion: "0.1.0",
-		MainBranch:     "main",
+		MainBranch:     "master",
 		ReleasePrefix:  "release/",
 		FeaturePrefix:  "feature/",
 		HotfixPrefix:   "fix/",
