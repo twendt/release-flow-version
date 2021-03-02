@@ -1,6 +1,6 @@
-module release-flow-version
+module github.com/twendt/release-flow-version
 
-go 1.15
+go 1.16
 
 require (
 	github.com/Masterminds/semver v1.5.0
