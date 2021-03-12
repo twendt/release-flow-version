@@ -17,29 +17,30 @@ const (
 type branch struct {
 	name   string
 	Remote string
+	cfg    *Config
 }
 
-func newBranch(name string, remote string) *branch {
-	return &branch{name: name, Remote: remote}
+func newBranch(cfg *Config, name string, remote string) *branch {
+	return &branch{name: name, Remote: remote, cfg: cfg}
 }
 
 func (b *branch) isReleaseBranch() bool {
-	remoteName := GetConfig().RemoteName
+	remoteName := b.cfg.RemoteName
 	name := strings.TrimPrefix(b.name, "refs/heads/")
 	name = strings.TrimPrefix(name, fmt.Sprintf("refs/remotes/%s/", remoteName))
-	releaseRegex := GetConfig().ReleaseRegex
+	releaseRegex := b.cfg.ReleaseRegex
 	return releaseRegex.MatchString(name)
 }
 
 func (b *branch) isMainBranch() bool {
-	return b.shortName() == GetConfig().MainBranch
+	return b.shortName() == b.cfg.MainBranch
 }
 
 func (b *branch) isFeatureBranch() bool {
-	remoteName := GetConfig().RemoteName
+	remoteName := b.cfg.RemoteName
 	name := strings.TrimPrefix(b.name, "refs/heads/")
 	name = strings.TrimPrefix(name, fmt.Sprintf("refs/remotes/%s/", remoteName))
-	featureRegex := GetConfig().FeatureRegex
+	featureRegex := b.cfg.FeatureRegex
 	return featureRegex.MatchString(b.name)
 }
 
@@ -62,7 +63,7 @@ func (b *branch) shortName() string {
 }
 
 func (b *branch) Name() string {
-	remote := GetConfig().RemoteName
+	remote := b.cfg.RemoteName
 	var remotePrefix = fmt.Sprint("refs/heads/remotes/%s/", remote)
 	var localPrefix = "refs/heads/"
 	name := strings.TrimPrefix(b.name, remotePrefix)

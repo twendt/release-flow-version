@@ -28,11 +28,12 @@ func (g *GitRepo) CurrentBranch() (*branch, error) {
 		return nil, fmt.Errorf("Failed to get head: %s", err)
 	}
 
-	return newBranch(string(head.Name()), ""), nil
+	return newBranch(g.cfg, string(head.Name()), ""), nil
 }
 
 func (g *GitRepo) CommitCountSinceRelease(release *release) (int, error) {
-	mainBranchName := fmt.Sprintf("refs/heads/%s", g.cfg.MainBranch)
+	//mainBranchName := fmt.Sprintf("refs/heads/%s", g.cfg.MainBranch)
+	mainBranchName := fmt.Sprintf("refs/remotes/%s/%s", g.cfg.RemoteName, g.cfg.MainBranch)
 	releaseBranchName := release.branch.name
 	baseCommit, err := g.MergeBase(mainBranchName, releaseBranchName)
 	if err != nil {
@@ -98,7 +99,7 @@ func (g *GitRepo) Branches() ([]*branch, error) {
 	err = references.ForEach(func(reference *plumbing.Reference) error {
 		name := string(reference.Name())
 		if strings.HasPrefix(name, localBranchPrefix) {
-			b := newBranch(name, "")
+			b := newBranch(g.cfg, name, "")
 			result = append(result, b)
 			return nil
 		}
@@ -110,7 +111,7 @@ func (g *GitRepo) Branches() ([]*branch, error) {
 
 		prefix := fmt.Sprintf("%s%s/", remoteBranchPrefix, remoteName)
 		if strings.HasPrefix(name, prefix) {
-			b := newBranch(name, remoteName)
+			b := newBranch(g.cfg, name, remoteName)
 			result = append(result, b)
 			return nil
 		}

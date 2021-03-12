@@ -19,6 +19,7 @@ type Config struct {
 	FeaturePrefix  string
 	HotfixPrefix   string
 	RemoteName     string
+	MainTag        string
 	ReleaseRegex   *regexp.Regexp
 	FeatureRegex   *regexp.Regexp
 }
@@ -33,11 +34,12 @@ func LoadConfig() error {
 func defaultConfig() *Config {
 	return &Config{
 		DefaultVersion: "0.1.0",
-		MainBranch:     "master",
+		MainBranch:     "main",
 		ReleasePrefix:  "release/",
 		FeaturePrefix:  "feature/",
 		HotfixPrefix:   "fix/",
 		RemoteName:     "origin",
+		MainTag:        "beta",
 	}
 }
 
