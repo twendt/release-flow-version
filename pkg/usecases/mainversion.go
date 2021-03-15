@@ -1,11 +1,13 @@
-package main
+package usecases
 
 import (
 	"fmt"
 	"github.com/Masterminds/semver"
+	"github.com/twendt/release-flow-version/pkg/config"
+	"github.com/twendt/release-flow-version/pkg/repository"
 )
 
-func mainBranchVersion(r *GitRepo, cfg *Config) (*semver.Version, error) {
+func MainBranchVersion(r *repository.GitRepo, cfg *config.Config) (*semver.Version, error) {
 	v, err := semver.NewVersion(cfg.DefaultVersion)
 	if err != nil {
 		return v, fmt.Errorf("Default version string is not a proper version number: %s", err)
@@ -30,7 +32,7 @@ func mainBranchVersion(r *GitRepo, cfg *Config) (*semver.Version, error) {
 		return v, fmt.Errorf("Failed to get commit count since last release: %s", err)
 	}
 
-	v, err = semver.NewVersion(latestRelease.name)
+	v, err = semver.NewVersion(latestRelease.Name)
 	if err != nil {
 		return v, fmt.Errorf("Latest release is not semver: %s", err)
 	}

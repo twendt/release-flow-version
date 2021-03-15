@@ -1,11 +1,12 @@
-package main
+package usecases
 
 import (
 	"fmt"
 	"github.com/Masterminds/semver"
+	"github.com/twendt/release-flow-version/pkg/repository"
 )
 
-func featureBranchVersion(r *GitRepo, currentBranch *branch) (*semver.Version, error) {
+func FeatureOrFixBranchVersion(r *repository.GitRepo, currentBranch *repository.Branch) (*semver.Version, error) {
 	v := &semver.Version{}
 
 	latestRelease, err := r.LatestRelease()
@@ -20,13 +21,13 @@ func featureBranchVersion(r *GitRepo, currentBranch *branch) (*semver.Version, e
 
 	//latestRelease := strings.TrimPrefix(latestReleaseBranch, "release/")
 
-	v, err = semver.NewVersion(latestRelease.name)
+	v, err = semver.NewVersion(latestRelease.Name)
 	if err != nil {
 		return v, fmt.Errorf("Release name is not a version number: %s", err)
 	}
 
 	*v = v.IncMinor()
-	*v, err = v.SetPrerelease(prereleaseStr(currentBranch.shortName(), counter))
+	*v, err = v.SetPrerelease(prereleaseStr(currentBranch.ShortName(), counter))
 	if err != nil {
 		return v, fmt.Errorf("Failed to set prerelease string: %s", err)
 	}

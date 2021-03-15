@@ -1,10 +1,13 @@
-package main
+package repository
 
 import (
 	"fmt"
+	"github.com/Masterminds/semver"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/twendt/release-flow-version/pkg/config"
+	"sort"
 	"strings"
 )
 
@@ -14,33 +17,43 @@ const (
 )
 
 type GitRepo struct {
-	r   *git.Repository
-	cfg *Config
+	r          *git.Repository
+	mainBranch *Branch
+	cfg        *config.Config
 }
 
-func NewGitRepo(r *git.Repository, cfg *Config) *GitRepo {
-	return &GitRepo{r: r, cfg: cfg}
+func NewGitRepo(r *git.Repository, cfg *config.Config) *GitRepo {
+	repo := &GitRepo{r: r, cfg: cfg}
+	return repo
 }
 
-func (g *GitRepo) CurrentBranch() (*branch, error) {
+func (g *GitRepo) CurrentBranch() (*Branch, error) {
 	head, err := g.r.Head()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get head: %s", err)
 	}
 
-	return newBranch(g.cfg, string(head.Name()), ""), nil
+	return NewBranch(g.cfg, string(head.Name()), ""), nil
 }
 
-func (g *GitRepo) CommitCountSinceRelease(release *release) (int, error) {
+func (g *GitRepo) CommitCountSinceRelease(release *Release) (int, error) {
 	//mainBranchName := fmt.Sprintf("refs/heads/%s", g.cfg.MainBranch)
-	mainBranchName := fmt.Sprintf("refs/remotes/%s/%s", g.cfg.RemoteName, g.cfg.MainBranch)
-	releaseBranchName := release.branch.name
-	baseCommit, err := g.MergeBase(mainBranchName, releaseBranchName)
+	mainBranch, err := g.MainBranch()
 	if err != nil {
-		return 0, fmt.Errorf("Failed to get merge base commit for %s and %s: %s", g.cfg.MainBranch, release.branch.name, err)
+		return 0, fmt.Errorf("Failed to get main branch: %s", err)
+	}
+
+	//mainBranchName := fmt.Sprintf("refs/remotes/%s/%s", g.cfg.RemoteName, g.cfg.MainBranch)
+	releaseBranchName := release.Branch.RawName()
+	baseCommit, err := g.MergeBase(mainBranch.RawName(), releaseBranchName)
+	if err != nil {
+		return 0, fmt.Errorf("Failed to get merge base commit for %s and %s: %s", mainBranch.RawName(), release.Branch.RawName(), err)
 	}
 
 	log, err := g.r.Log(&git.LogOptions{})
+	if err != nil {
+		return 0, fmt.Errorf("Failed to get git log: %s", err)
+	}
 
 	counter := 0
 	for {
@@ -78,6 +91,10 @@ func (g *GitRepo) MergeBase(b1, b2 string) (*object.Commit, error) {
 		commits = append(commits, commit)
 	}
 
+	if commits == nil || len(commits) < 2 {
+		return nil, fmt.Errorf("Missing commits to find merge base")
+	}
+
 	res, err := commits[0].MergeBase(commits[1])
 	if err != nil {
 		return nil, fmt.Errorf("could not traverse the repository history: %s", err)
@@ -89,8 +106,8 @@ func (g *GitRepo) MergeBase(b1, b2 string) (*object.Commit, error) {
 	return res[0], nil
 }
 
-func (g *GitRepo) Branches() ([]*branch, error) {
-	result := []*branch{}
+func (g *GitRepo) Branches() ([]*Branch, error) {
+	result := []*Branch{}
 
 	references, err := g.r.References()
 	if err != nil {
@@ -99,19 +116,19 @@ func (g *GitRepo) Branches() ([]*branch, error) {
 	err = references.ForEach(func(reference *plumbing.Reference) error {
 		name := string(reference.Name())
 		if strings.HasPrefix(name, localBranchPrefix) {
-			b := newBranch(g.cfg, name, "")
+			b := NewBranch(g.cfg, name, "")
 			result = append(result, b)
 			return nil
 		}
 
-		remoteName := cfg.RemoteName
+		remoteName := g.cfg.RemoteName
 		if remoteName == "" {
 			remoteName = "origin"
 		}
 
 		prefix := fmt.Sprintf("%s%s/", remoteBranchPrefix, remoteName)
 		if strings.HasPrefix(name, prefix) {
-			b := newBranch(g.cfg, name, remoteName)
+			b := NewBranch(g.cfg, name, remoteName)
 			result = append(result, b)
 			return nil
 		}
@@ -123,26 +140,43 @@ func (g *GitRepo) Branches() ([]*branch, error) {
 	return result, nil
 }
 
-func (g *GitRepo) Releases() ([]*release, error) {
+func (g *GitRepo) MainBranch() (*Branch, error) {
+	if g.mainBranch != nil {
+		return g.mainBranch, nil
+	}
+
 	branches, err := g.Branches()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get branches for repo: %s", err)
 	}
 
-	releases := []*release{}
+	for _, b := range branches {
+		return b, nil
+	}
+
+	return nil, fmt.Errorf("Main banch not found")
+}
+
+func (g *GitRepo) Releases() ([]*Release, error) {
+	branches, err := g.Branches()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get branches for repo: %s", err)
+	}
+
+	releases := []*Release{}
 
 	for _, b := range branches {
-		if !b.isReleaseBranch() {
+		if !b.IsReleaseBranch() {
 			continue
 		}
 
-		releases = append(releases, newRelease(b.shortName(), b))
+		releases = append(releases, NewRelease(b.ShortName(), b))
 	}
 
 	return releases, nil
 }
 
-func (g *GitRepo) LatestRelease() (*release, error) {
+func (g *GitRepo) LatestRelease() (*Release, error) {
 	releases, err := g.Releases()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get releases: %s", err)
@@ -152,7 +186,7 @@ func (g *GitRepo) LatestRelease() (*release, error) {
 		return nil, nil
 	}
 
-	latestRelease, err := latestReleaseFromList(releases)
+	latestRelease, err := LatestReleaseFromList(releases)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get latest release from %v: %s", releases, err)
 	}
@@ -176,4 +210,45 @@ func (g *GitRepo) CommitCountCurrentBranch() (int, error) {
 	}
 
 	return counter, nil
+}
+
+func LatestReleaseFromList(releases []*Release) (*Release, error) {
+	vs := make([]*semver.Version, len(releases))
+	for i, r := range releases {
+		v, err := semver.NewVersion(r.Name)
+		if err != nil {
+			return nil, fmt.Errorf("Error parsing version: %s", err)
+		}
+
+		vs[i] = v
+	}
+
+	sort.Sort(semver.Collection(vs))
+
+	result := &Release{}
+	latest := vs[len(vs)-1].String()
+	for _, r := range releases {
+		if r.Name == latest {
+			result = r
+		}
+	}
+
+	return result, nil
+}
+
+//FindBranchByName searches all branches to find a matching name
+//The match can begin with refs/heads/ or refs/remotes/name/
+func (g *GitRepo) FindBranchByName(name string) (*Branch, error) {
+	branches, err := g.Branches()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get branches in repo: %s", err)
+	}
+
+	for _, b := range branches {
+		if b.Name() == name {
+			return b, nil
+		}
+	}
+
+	return nil, fmt.Errorf("No local or remote branch %s found", name)
 }
