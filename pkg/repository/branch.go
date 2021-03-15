@@ -74,12 +74,7 @@ func (b *Branch) ShortName() string {
 }
 
 func (b *Branch) Name() string {
-	remote := b.cfg.RemoteName
-	var remotePrefix = fmt.Sprint("refs/heads/remotes/%s/", remote)
-	var localPrefix = "refs/heads/"
-	name := strings.TrimPrefix(b.name, remotePrefix)
-	name = strings.TrimPrefix(name, localPrefix)
-
+	name := TrimRefPrefix(b.name, b.cfg.RemoteName)
 	return name
 }
 
