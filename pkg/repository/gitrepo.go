@@ -151,7 +151,9 @@ func (g *GitRepo) MainBranch() (*Branch, error) {
 	}
 
 	for _, b := range branches {
-		return b, nil
+		if b.IsMainBranch() {
+			return b, nil
+		}
 	}
 
 	return nil, fmt.Errorf("Main banch not found")
