@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	branchVariable = "Build_Branch"
+	branchVariable = "BUILD_SOURCEBRANCH"
 	agentVariable  = "TF_BUILD"
 )
 
