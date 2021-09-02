@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"fmt"
+	"strings"
 	"github.com/Masterminds/semver"
 	"github.com/twendt/release-flow-version/pkg/repository"
 )
@@ -38,5 +39,6 @@ func FeatureOrFixBranchVersion(r *repository.GitRepo, currentBranch *repository.
 }
 
 func prereleaseStr(tag string, counter int) string {
+	tag = strings.Replace(tag, "_", "-", -1)
 	return fmt.Sprintf("%s.%d", tag, counter)
 }
